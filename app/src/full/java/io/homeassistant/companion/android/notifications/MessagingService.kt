@@ -85,6 +85,15 @@ class MessagingService : FirebaseMessagingService() {
         const val KEY_TEXT_REPLY = "key_text_reply"
         const val ALERT_ONCE = "alert_once"
         const val INTENT_CLASS_NAME = "intent_class_name"
+        const val COMMAND = "command"
+        const val TTS_TEXT = "tts_text"
+
+        // special intent constants
+        const val INTENT_PACKAGE_NAME = "intent_package_name"
+        const val INTENT_ACTION = "intent_action"
+        const val INTENT_EXTRAS = "intent_extras"
+        const val INTENT_URI = "intent_uri"
+        const val INTENT_TYPE = "intent_type"
 
         // special action constants
         const val REQUEST_LOCATION_UPDATE = "request_location_update"
@@ -126,7 +135,7 @@ class MessagingService : FirebaseMessagingService() {
         const val TURN_ON = "turn_on"
         const val TURN_OFF = "turn_off"
 
-        // Media Commands
+        // Media constants
         const val MEDIA_FAST_FORWARD = "fast_forward"
         const val MEDIA_NEXT = "next"
         const val MEDIA_PAUSE = "pause"
@@ -135,6 +144,9 @@ class MessagingService : FirebaseMessagingService() {
         const val MEDIA_PREVIOUS = "previous"
         const val MEDIA_REWIND = "rewind"
         const val MEDIA_STOP = "stop"
+        const val MEDIA_PACKAGE_NAME = "media_package_name"
+        const val MEDIA_COMMAND = "media_command"
+        const val MEDIA_STREAM = "media_stream"
 
         const val COMMAND_KEEP_SCREEN_ON = "keep_screen_on"
 
@@ -205,7 +217,7 @@ class MessagingService : FirebaseMessagingService() {
                     Log.d(TAG, "Processing device command")
                     when (it[MESSAGE]) {
                         COMMAND_DND -> {
-                            if (it[TITLE] in DND_COMMANDS) {
+                            if (it[COMMAND] in DND_COMMANDS) {
                                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M)
                                     handleDeviceCommands(it)
                                 else {
@@ -222,7 +234,7 @@ class MessagingService : FirebaseMessagingService() {
                             }
                         }
                         COMMAND_RINGER_MODE -> {
-                            if (it[TITLE] in RM_COMMANDS) {
+                            if (it[COMMAND] in RM_COMMANDS) {
                                 handleDeviceCommands(it)
                             } else {
                                 mainScope.launch {
@@ -232,7 +244,7 @@ class MessagingService : FirebaseMessagingService() {
                             }
                         }
                         COMMAND_BROADCAST_INTENT -> {
-                            if (!it[TITLE].isNullOrEmpty() && !it["channel"].isNullOrEmpty())
+                            if (!it[INTENT_ACTION].isNullOrEmpty() && !it[INTENT_PACKAGE_NAME].isNullOrEmpty())
                                 handleDeviceCommands(it)
                             else {
                                 mainScope.launch {
@@ -242,8 +254,8 @@ class MessagingService : FirebaseMessagingService() {
                             }
                         }
                         COMMAND_VOLUME_LEVEL -> {
-                            if (!it["channel"].isNullOrEmpty() && it["channel"] in CHANNEL_VOLUME_STREAM &&
-                                !it[TITLE].isNullOrEmpty() && it[TITLE]?.toIntOrNull() != null
+                            if (!it[MEDIA_STREAM].isNullOrEmpty() && it[MEDIA_STREAM] in CHANNEL_VOLUME_STREAM &&
+                                !it[COMMAND].isNullOrEmpty() && it[COMMAND]?.toIntOrNull() != null
                             )
                                 handleDeviceCommands(it)
                             else {
@@ -254,7 +266,7 @@ class MessagingService : FirebaseMessagingService() {
                             }
                         }
                         COMMAND_BLUETOOTH -> {
-                            if (!it[TITLE].isNullOrEmpty() && it[TITLE] in ENABLE_COMMANDS)
+                            if (!it[COMMAND].isNullOrEmpty() && it[COMMAND] in ENABLE_COMMANDS)
                                 handleDeviceCommands(it)
                             else {
                                 mainScope.launch {
@@ -264,7 +276,7 @@ class MessagingService : FirebaseMessagingService() {
                             }
                         }
                         COMMAND_BLE_TRANSMITTER -> {
-                            if (!it[TITLE].isNullOrEmpty() && it[TITLE] in ENABLE_COMMANDS)
+                            if (!it[COMMAND].isNullOrEmpty() && it[COMMAND] in ENABLE_COMMANDS)
                                 handleDeviceCommands(it)
                             else {
                                 mainScope.launch {
@@ -274,7 +286,7 @@ class MessagingService : FirebaseMessagingService() {
                             }
                         }
                         COMMAND_HIGH_ACCURACY_MODE -> {
-                            if (!it[TITLE].isNullOrEmpty() && it[TITLE] in ENABLE_COMMANDS)
+                            if (!it[COMMAND].isNullOrEmpty() && it[COMMAND] in ENABLE_COMMANDS)
                                 handleDeviceCommands(it)
                             else {
                                 mainScope.launch {
@@ -286,7 +298,7 @@ class MessagingService : FirebaseMessagingService() {
                             }
                         }
                         COMMAND_ACTIVITY -> {
-                            if (!it["tag"].isNullOrEmpty())
+                            if (!it[INTENT_ACTION].isNullOrEmpty())
                                 handleDeviceCommands(it)
                             else {
                                 mainScope.launch {
@@ -302,7 +314,7 @@ class MessagingService : FirebaseMessagingService() {
                             handleDeviceCommands(it)
                         }
                         COMMAND_MEDIA -> {
-                            if (!it[TITLE].isNullOrEmpty() && it[TITLE] in MEDIA_COMMANDS && !it["channel"].isNullOrEmpty()) {
+                            if (!it[COMMAND].isNullOrEmpty() && it[COMMAND] in MEDIA_COMMANDS && !it[MEDIA_PACKAGE_NAME].isNullOrEmpty()) {
                                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP_MR1) {
                                     handleDeviceCommands(it)
                                 } else {
@@ -357,7 +369,7 @@ class MessagingService : FirebaseMessagingService() {
 
     private fun speakNotification(data: Map<String, String>) {
         var textToSpeech: TextToSpeech? = null
-        var tts = data[TITLE]
+        var tts = data[TTS_TEXT]
         val audioManager = applicationContext.getSystemService(Context.AUDIO_SERVICE) as AudioManager
         val currentAlarmVolume = audioManager.getStreamVolume(AudioManager.STREAM_ALARM)
         val maxAlarmVolume = audioManager.getStreamMaxVolume(AudioManager.STREAM_ALARM)
@@ -369,26 +381,26 @@ class MessagingService : FirebaseMessagingService() {
             if (it == TextToSpeech.SUCCESS) {
                 val listener = object : UtteranceProgressListener() {
                     override fun onStart(p0: String?) {
-                        if (data["channel"] == ALARM_STREAM_MAX)
+                        if (data[MEDIA_STREAM] == ALARM_STREAM_MAX)
                             audioManager.setStreamVolume(AudioManager.STREAM_ALARM, maxAlarmVolume, 0)
                     }
 
                     override fun onDone(p0: String?) {
                         textToSpeech?.stop()
                         textToSpeech?.shutdown()
-                        if (data["channel"] == ALARM_STREAM_MAX)
+                        if (data[MEDIA_STREAM] == ALARM_STREAM_MAX)
                             audioManager.setStreamVolume(AudioManager.STREAM_ALARM, currentAlarmVolume, 0)
                     }
 
                     override fun onError(p0: String?) {
                         textToSpeech?.stop()
                         textToSpeech?.shutdown()
-                        if (data["channel"] == ALARM_STREAM_MAX)
+                        if (data[MEDIA_STREAM] == ALARM_STREAM_MAX)
                             audioManager.setStreamVolume(AudioManager.STREAM_ALARM, currentAlarmVolume, 0)
                     }
                 }
                 textToSpeech?.setOnUtteranceProgressListener(listener)
-                if (data["channel"] == ALARM_STREAM || data["channel"] == ALARM_STREAM_MAX) {
+                if (data[MEDIA_STREAM] == ALARM_STREAM || data[MEDIA_STREAM] == ALARM_STREAM_MAX) {
                     val audioAttributes = AudioAttributes.Builder()
                         .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
                         .setUsage(AudioAttributes.USAGE_ALARM)
@@ -411,7 +423,7 @@ class MessagingService : FirebaseMessagingService() {
 
     private fun handleDeviceCommands(data: Map<String, String>) {
         val message = data[MESSAGE]
-        val title = data[TITLE]
+        val command = data[COMMAND]
         when (message) {
             COMMAND_DND -> {
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
@@ -420,7 +432,7 @@ class MessagingService : FirebaseMessagingService() {
                     if (!notificationManager.isNotificationPolicyAccessGranted) {
                         requestDNDPermission()
                     } else {
-                        when (title) {
+                        when (command) {
                             DND_ALARMS_ONLY -> notificationManager.setInterruptionFilter(
                                 NotificationManager.INTERRUPTION_FILTER_ALARMS
                             )
@@ -444,17 +456,17 @@ class MessagingService : FirebaseMessagingService() {
                     if (!notificationManager.isNotificationPolicyAccessGranted) {
                         requestDNDPermission()
                     } else {
-                        processRingerMode(audioManager, title)
+                        processRingerMode(audioManager, command)
                     }
                 } else {
-                    processRingerMode(audioManager, title)
+                    processRingerMode(audioManager, command)
                 }
             }
             COMMAND_BROADCAST_INTENT -> {
                 try {
-                    val packageName = data["channel"]
-                    val intent = Intent(title)
-                    val extras = data["group"]
+                    val packageName = data[INTENT_PACKAGE_NAME]
+                    val intent = Intent(data[INTENT_ACTION])
+                    val extras = data[INTENT_EXTRAS]
                     val className = data[INTENT_CLASS_NAME]
                     if (!extras.isNullOrEmpty()) {
                         val items = extras.split(',')
@@ -499,37 +511,37 @@ class MessagingService : FirebaseMessagingService() {
                     } else {
                         processStreamVolume(
                             audioManager,
-                            data["channel"].toString(),
-                            title!!.toInt()
+                            data[MEDIA_STREAM].toString(),
+                            command!!.toInt()
                         )
                     }
                 } else {
                     processStreamVolume(
                         audioManager,
-                        data["channel"].toString(),
-                        title!!.toInt()
+                        data[MEDIA_STREAM].toString(),
+                        command!!.toInt()
                     )
                 }
             }
             COMMAND_BLUETOOTH -> {
                 val bluetoothAdapter = BluetoothAdapter.getDefaultAdapter()
-                if (title == TURN_OFF)
+                if (command == TURN_OFF)
                     bluetoothAdapter.disable()
-                if (title == TURN_ON)
+                if (command == TURN_ON)
                     bluetoothAdapter.enable()
             }
             COMMAND_BLE_TRANSMITTER -> {
-                if (title == TURN_OFF)
+                if (command == TURN_OFF)
                     BluetoothSensorManager.enableDisableBLETransmitter(applicationContext, false)
-                if (title == TURN_ON)
+                if (command == TURN_ON)
                     BluetoothSensorManager.enableDisableBLETransmitter(applicationContext, true)
             }
             COMMAND_HIGH_ACCURACY_MODE -> {
-                if (title == TURN_OFF) {
+                if (command == TURN_OFF) {
                     HighAccuracyLocationService.stopService(applicationContext)
                     LocationSensorManager.setHighAccuracyModeSetting(applicationContext, false)
                 }
-                if (title == TURN_ON) {
+                if (command == TURN_ON) {
                     HighAccuracyLocationService.startService(applicationContext, LocationSensorManager.getHighAccuracyModeIntervalSetting(applicationContext))
                     LocationSensorManager.setHighAccuracyModeSetting(applicationContext, true)
                 }
@@ -548,9 +560,9 @@ class MessagingService : FirebaseMessagingService() {
                     if (!Settings.canDrawOverlays(applicationContext))
                         requestSystemAlertPermission()
                     else
-                        openWebview(title)
+                        openWebview(command)
                 } else
-                    openWebview(title)
+                    openWebview(command)
             }
             COMMAND_SCREEN_ON -> {
                 if (!title.isNullOrEmpty()) {
@@ -1194,13 +1206,13 @@ class MessagingService : FirebaseMessagingService() {
     }
 
     private fun processMediaCommand(data: Map<String, String>) {
-        val title = data[TITLE]
+        val title = data[MEDIA_COMMAND]
         val mediaSessionManager = applicationContext.getSystemService(Context.MEDIA_SESSION_SERVICE) as MediaSessionManager
         val mediaList = mediaSessionManager.getActiveSessions(ComponentName(applicationContext, NotificationSensorManager::class.java))
         var hasCorrectPackage = false
         if (mediaList.size > 0) {
             for (item in mediaList) {
-                if (item.packageName == data["channel"]) {
+                if (item.packageName == data[MEDIA_PACKAGE_NAME]) {
                     hasCorrectPackage = true
                     val mediaSessionController = MediaController(applicationContext, item.sessionToken)
                     val success = mediaSessionController.dispatchMediaButtonEvent(KeyEvent(KeyEvent.ACTION_DOWN, getKeyEvent(title!!)))
@@ -1272,17 +1284,17 @@ class MessagingService : FirebaseMessagingService() {
 
     private fun processActivityCommand(data: Map<String, String>) {
         try {
-            val packageName = data["channel"]
-            val action = data["tag"]
+            val packageName = data[INTENT_PACKAGE_NAME]
+            val action = data[INTENT_ACTION]
             val className = data[INTENT_CLASS_NAME]
-            val intentUri = if (!data[TITLE].isNullOrEmpty()) Uri.parse(data[TITLE]) else null
+            val intentUri = if (!data[INTENT_URI].isNullOrEmpty()) Uri.parse(data[INTENT_URI]) else null
             val intent = if (intentUri != null) Intent(action, intentUri) else Intent(action)
-            val type = data["subject"]
+            val type = data[INTENT_TYPE]
             if (!type.isNullOrEmpty())
                 intent.type = type
             if (!className.isNullOrEmpty() && !packageName.isNullOrEmpty())
                 intent.setClassName(packageName, className)
-            val extras = data["group"]
+            val extras = data[INTENT_EXTRAS]
             if (!extras.isNullOrEmpty()) {
                 val items = extras.split(',')
                 for (item in items) {
