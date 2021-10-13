@@ -565,10 +565,10 @@ class MessagingService : FirebaseMessagingService() {
                     openWebview(command)
             }
             COMMAND_SCREEN_ON -> {
-                if (!title.isNullOrEmpty()) {
+                if (!command.isNullOrEmpty()) {
                     mainScope.launch {
                         integrationUseCase.setKeepScreenOnEnabled(
-                            title == COMMAND_KEEP_SCREEN_ON
+                            command == COMMAND_KEEP_SCREEN_ON
                         )
                     }
                 }
